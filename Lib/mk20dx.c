@@ -454,7 +454,7 @@ const uint8_t flashconfigbytes[16] = {
 	0xFF, 0xFF, 0xFF, 0xFE, // Program Flash Protection Bytes FPROT0-3
 
 	0xBE, // Flash security byte FSEC
-	0x03, // Flash nonvolatile option byte FOPT
+	0x01, // Flash nonvolatile option byte FOPT
 	0xFF, // EEPROM Protection Byte FEPROT
 	0xFF, // Data Flash Protection Byte FDPROT
 };
