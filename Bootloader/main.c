@@ -187,16 +187,9 @@ void main()
 
 #elif defined(_mk20dx256vlh7_) // Kiibohd-dfu
 	// Enabling LED to indicate we are in the bootloader
-	GPIOA_PDDR |= (1<<5);
-	// Setup pin - A5 - See Lib/pin_map.mchck for more details on pins
-	PORTA_PCR5 = PORT_PCR_SRE | PORT_PCR_DSE | PORT_PCR_MUX(1);
-	GPIOA_PSOR |= (1<<5);
-
-	// TODO Add CMake configuration for disabling
-	// Set LCD backlight on ICED to Red
-	GPIOC_PDDR |= (1<<1);
-	PORTC_PCR1 = PORT_PCR_SRE | PORT_PCR_DSE | PORT_PCR_MUX(1);
-	GPIOC_PCOR |= (1<<1);
+	GPIOB_PDDR |= (1<<19); // set as output pin
+	PORTB_PCR19 = PORT_PCR_MUX(1); // config as GPIO
+	GPIOB_PSOR |= (1<<19);
 #else
 #error "Incompatible chip for bootloader"
 #endif
