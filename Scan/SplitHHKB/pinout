@@ -1,0 +1,99 @@
+* this file is not correct
+Pin Usage
+=========
+
+mk20dx256vlh7
+
+ ----
+|Keys|
+ ----
+
+* Strobe (Columns)
+
+PTB2
+PTB3
+PTB18
+PTB19
+PTC0
+PTC9
+PTC10
+PTC11
+PTD0
+
+* Sense (Rows)
+
+PTD1
+PTD4
+PTD5
+PTD6
+PTD7
+PTC1
+PTC2
+PTC3
+
+
+ -----
+|Clock|
+ -----
+
+PTA18 <-> PTA19
+
+ ---
+|DAC|
+ ---
+
+DAC0 (N/C)
+
+
+ ----
+|UART|
+ ----
+
+* Comm - For bi-directional communication between halves
+
+PTA1 - RX0 (Master Side)
+PTA2 - TX0 (Master Side)
+
+PTD2 - RX2 (UART Debug Header)
+PTD3 - TX2 (UART Debug Header)
+
+
+ -----
+|Debug|
+ -----
+
+* SWD - (Main reflash header)
+
+PTA0 (Pull-down)
+PTA3 (Pull-up)
+
+* LEDs
+
+PTB19 (LED only for PCB, not Teensy)
+
+* UARTs
+
+PTD2 - RX2 (UART Debug Header, label as RX2)
+PTD3 - TX2 (UART Debug Header, label as TX2)
+
+
+ ------
+|Unused|
+ ------
+
+* GPIO
+
+PTA4
+PTA12
+PTA13
+PTC4
+PTC5
+PTC6
+PTC7
+PTE0
+PTE1
+
+* Analog
+
+TODO
+
