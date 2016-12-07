@@ -71,10 +71,10 @@ inline void init_errorLED()
 #elif defined(_mk20dx256vlh7_)
 	// Kiibohd-dfu
 	// Enable pin
-	GPIOA_PDDR |= (1<<5);
+	GPIOB_PDDR |= (1<<19);
 
 	// Setup pin - A5 - See Lib/pin_map.mchck for more details on pins
-	PORTA_PCR5 = PORT_PCR_SRE | PORT_PCR_DSE | PORT_PCR_MUX(1);
+	PORTB_PCR19 = PORT_PCR_MUX(1);
 #endif
 }
 
@@ -133,11 +133,11 @@ inline void errorLED( uint8_t on )
 	// Kiibohd-dfu
 	// Error LED On (A5)
 	if ( on ) {
-		GPIOA_PSOR |= (1<<5);
+		GPIOB_PSOR |= (1<<19);
 	}
 	// Error LED Off
 	else {
-		GPIOA_PCOR |= (1<<5);
+		GPIOB_PCOR |= (1<<19);
 	}
 
 #endif

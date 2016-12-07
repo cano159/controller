@@ -53,9 +53,9 @@ inline void Scan_setup()
 	// Setup GPIO pins for matrix scanning
 	Matrix_setup();
 
-    // Setup LED pin
-    GPIOB_PDDR |= (1<<19);
-    PORTB_PCR19 = PORT_PCR_MUX(1);
+	// Setup LED pin
+	GPIOB_PDDR |= (1<<19);
+	PORTB_PCR19 = PORT_PCR_MUX(1);
 
 	// Reset scan count
 	Scan_scanCount = 0;
@@ -68,10 +68,10 @@ inline uint8_t Scan_loop()
 	// Scan Matrix
 	Matrix_scan( Scan_scanCount++ );
 
-    GPIOB_PSOR |= (1<<19);
-    for (int i = 0; i < 2000000; i++) asm("nop;");
-    GPIOB_PCOR |= (1<<19);
-    for (int i = 0; i < 2000000; i++) asm("nop;");
+	GPIOB_PSOR |= (1<<19);
+	for (int i = 0; i < 2000000; i++) asm("nop;");
+	GPIOB_PCOR |= (1<<19);
+	for (int i = 0; i < 2000000; i++) asm("nop;");
 
 	return 0;
 }
