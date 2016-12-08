@@ -892,6 +892,9 @@
 #define ADC0_CLP2               *(volatile uint32_t *)0x4003B044 // ADC plus-side general calibration value register
 #define ADC0_CLP1               *(volatile uint32_t *)0x4003B048 // ADC plus-side general calibration value register
 #define ADC0_CLP0               *(volatile uint32_t *)0x4003B04C // ADC plus-side general calibration value register
+#define ADC0_PGA                *(volatile uint32_t *)0x4003B050 // ADC PGA register
+#define ADC_PGA_PGAEN                   (uint32_t)(1 << 23)             // PGA enable
+#define ADC_PGA_PGALPb                  (uint32_t)(1 << 20)             // PGA power mode control (0 = low power, 1 = normal power)
 #define ADC0_CLMD               *(volatile uint32_t *)0x4003B054 // ADC minus-side general calibration value register
 #define ADC0_CLMS               *(volatile uint32_t *)0x4003B058 // ADC minus-side general calibration value register
 #define ADC0_CLM4               *(volatile uint32_t *)0x4003B05C // ADC minus-side general calibration value register
@@ -920,6 +923,7 @@
 #define ADC1_CLP2               *(volatile uint32_t *)0x400BB044 // ADC plus-side general calibration value register
 #define ADC1_CLP1               *(volatile uint32_t *)0x400BB048 // ADC plus-side general calibration value register
 #define ADC1_CLP0               *(volatile uint32_t *)0x400BB04C // ADC plus-side general calibration value register
+#define ADC1_PGA                *(volatile uint32_t *)0x400BB050 // ADC PGA register
 #define ADC1_CLMD               *(volatile uint32_t *)0x400BB054 // ADC minus-side general calibration value register
 #define ADC1_CLMS               *(volatile uint32_t *)0x400BB058 // ADC minus-side general calibration value register
 #define ADC1_CLM4               *(volatile uint32_t *)0x400BB05C // ADC minus-side general calibration value register
