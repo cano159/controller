@@ -10,7 +10,7 @@
 ###
 # Required Sub-modules
 #
-AddModule ( Scan MatrixARM )
+#AddModule ( Scan )
 
 
 ###

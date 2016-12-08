@@ -1,4 +1,6 @@
-/* Copyright (C) 2014-2016 by Jacob Alexander
+/**
+ * Copyright (C) 2014-2016 by Jacob Alexander
+ * Copyright (C) 2016 by Tom Smalley
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,14 +27,17 @@
 #include <Lib/ScanLib.h>
 
 // Project Includes
+#include <stdbool.h>
 #include <cli.h>
 #include <print.h>
-#include <matrix_scan.h>
+//#include <matrix_scan.h>
 #include <macro.h>
 #include <output_com.h>
+#include <Lib/delay.h>
 
 // Local Includes
 #include "scan_loop.h"
+#include "adc.c"
 
 
 
@@ -40,25 +45,111 @@
 
 // ----- Variables -----
 
-// Number of scans since the last USB send
-uint16_t Scan_scanCount = 0;
-
-
+// 6 reads on left hand side
+uint8_t numReads = 6;
+uint8_t numStrobes = 5;
+// Usually determined by RC circuit time constant * 5
+// Lower if using drain
+uint32_t RELAX_TIME = 5;
 
 // ----- Functions -----
+
+/* Select a channel on the multiplexer */
+void selectReadLine(uint8_t r) {
+
+	// clear pins
+	GPIOA_PCOR |= (1 << 5);  // S0 = PTA5
+	GPIOA_PCOR |= (1 << 12); // S1 = PTA12
+	GPIOA_PCOR |= (1 << 13); // S1 = PTA13
+
+	// set pins (decode r to binary)
+	if (r & 1) {
+		GPIOA_PSOR |= (1 << 5);
+	}
+	if ((r >> 1) & 1) {
+		GPIOA_PSOR |= (1 << 12);
+	}
+	if ((r >> 2) & 1) {
+		GPIOA_PSOR |= (1 << 13);
+	}
+
+}
+
+uint32_t lastTime = 0;
+/**
+ * Perform a measurement of the selected read line using given strobe line.
+ */
+uint8_t strobeRead(uint8_t s)
+{
+	uint8_t value;
+	// Make sure enough time has elapsed since the last call
+	// This is to ensure the matrix voltages have relaxed
+	while (micros() < lastTime + RELAX_TIME);
+	// Float the drain pin
+	GPIOA_PSOR |= (1 << 4); // High floats pin in open drain mode
+	// No interrupts which might ruin timing
+	__disable_irq();
+	// Strobes are PTD0-4 which is convenient
+	GPIOD_PSOR |= (1 << s); // Set strobe high
+	// Get the ADC reading
+	value = adcRead();
+	GPIOD_PCOR |= (1 << s); // Set strobe low
+	__enable_irq();
+	// Ground the drain pin
+	GPIOA_PCOR |= (1 << 4); // Low grounds pin in open drain mode
+	// Set timer for next read
+	lastTime = micros();
+	return value;
+}
+
+/* use calibration values to normalise readings nicely */
+uint8_t normalise(uint8_t value) {
+	uint16_t calMin = 45;
+	uint16_t calMax = 245;
+	// Clamp to min and max values
+	if (value < calMin) {
+		value = calMin;
+	} else if (value > calMax) {
+		value = calMax;
+	}
+	// Feature scaling, scale needs to be done before int division
+	// Cast is okay because the fraction must be between 0 and 1 due to
+	// clamping.
+	uint16_t numerator = 0xFF * (value - calMin);
+	uint8_t denominator = calMax - calMin;
+	return (uint8_t) (numerator / denominator);
+}
 
 // Setup
 inline void Scan_setup()
 {
-	// Setup GPIO pins for matrix scanning
-	Matrix_setup();
+	// Setup GPIO pins for mux (PTA5, PTA12, PTA13)
+	PORTA_PCR5 = PORT_PCR_SRE | PORT_PCR_DSE | PORT_PCR_MUX(1);
+	GPIOA_PDDR |= (1<<5);
+	PORTA_PCR12 = PORT_PCR_SRE | PORT_PCR_DSE | PORT_PCR_MUX(1);
+	GPIOA_PDDR |= (1<<12);
+	PORTA_PCR13 = PORT_PCR_SRE | PORT_PCR_DSE | PORT_PCR_MUX(1);
+	GPIOA_PDDR |= (1<<13);
+	// Setup drain pin (PTA4)
+	PORTA_PCR4 = PORT_PCR_SRE | PORT_PCR_DSE | PORT_PCR_ODE | PORT_PCR_MUX(1);
+	GPIOA_PDDR |= (1<<4);
+	// Setup strobes (PTD0-4)
+	PORTD_PCR0 = PORT_PCR_SRE | PORT_PCR_DSE | PORT_PCR_MUX(1);
+	GPIOD_PDDR |= (1 << 0);
+	PORTD_PCR1 = PORT_PCR_SRE | PORT_PCR_DSE | PORT_PCR_MUX(1);
+	GPIOD_PDDR |= (1 << 1);
+	PORTD_PCR2 = PORT_PCR_SRE | PORT_PCR_DSE | PORT_PCR_MUX(1);
+	GPIOD_PDDR |= (1 << 2);
+	PORTD_PCR3 = PORT_PCR_SRE | PORT_PCR_DSE | PORT_PCR_MUX(1);
+	GPIOD_PDDR |= (1 << 3);
+	PORTD_PCR4 = PORT_PCR_SRE | PORT_PCR_DSE | PORT_PCR_MUX(1);
+	GPIOD_PDDR |= (1 << 4);
 
-	// Setup LED pin
-	GPIOB_PDDR |= (1<<19);
-	PORTB_PCR19 = PORT_PCR_MUX(1);
+	// Initialise ADC
+	adcInit();
 
-	// Reset scan count
-	Scan_scanCount = 0;
+	//Matrix_setup();
+
 }
 
 
@@ -66,12 +157,34 @@ inline void Scan_setup()
 inline uint8_t Scan_loop()
 {
 	// Scan Matrix
-	Matrix_scan( Scan_scanCount++ );
+	//Matrix_scan( Scan_scanCount++ );
+	for (int read = 0; read < numReads; read++) {
+		selectReadLine(read);
+		/*
+		print(" r ");
+		printInt8(read);
+		*/
+		for (int strobe = 0; strobe < 5; strobe++) {
+			uint8_t value = strobeRead(strobe);
+			uint8_t norm = normalise((uint8_t)value);
+			if (norm > 0x80) {
+				printInt8(read);
+				print(" ");
+				printInt8(strobe);
+				print(NL);
+			}
 
-	GPIOB_PSOR |= (1<<19);
-	for (int i = 0; i < 2000000; i++) asm("nop;");
-	GPIOB_PCOR |= (1<<19);
-	for (int i = 0; i < 2000000; i++) asm("nop;");
+			/*
+			print(" | ");
+			printInt8(strobe);
+			print(" ");
+			printInt8Pad(value);
+			print(" ");
+			printInt8Pad(norm);
+			*/
+		}
+	}
+	//print(NL);
 
 	return 0;
 }
@@ -86,9 +199,6 @@ inline void Scan_finishedWithMacro( uint8_t sentKeys )
 // Signal from Output Module that all keys have been processed (that it knows about)
 inline void Scan_finishedWithOutput( uint8_t sentKeys )
 {
-	// Reset scan loop indicator (resets each key debounce state)
-	// TODO should this occur after USB send or Macro processing?
-	Scan_scanCount = 0;
 }
 
 
@@ -97,6 +207,5 @@ inline void Scan_finishedWithOutput( uint8_t sentKeys )
 void Scan_currentChange( unsigned int current )
 {
 	// Indicate to all submodules current change
-	Matrix_currentChange( current );
 }
 
