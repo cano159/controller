@@ -96,6 +96,7 @@ void printstrs( char* first, ... );
 #define printHex32(hex) printHex32_op(hex, 1)
 
 void printInt8    ( uint8_t  in );
+void printInt8Pad ( uint8_t  in );
 void printInt16   ( uint16_t in );
 void printInt32   ( uint32_t in );
 void printHex_op  ( uint16_t in, uint8_t op );

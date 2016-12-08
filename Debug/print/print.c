@@ -84,6 +84,25 @@ void printInt8( uint8_t in )
 	dPrintStr( tmpStr );
 }
 
+void printInt8Pad( uint8_t in )
+{
+	// Max number of characters is 3 + 1 for null
+	char tmpStr[4];
+
+	// Convert number
+	int8ToStr( in, tmpStr );
+
+	if (in < 100) {
+		print(" ");
+	}
+	if (in < 10) {
+		print(" ");
+	}
+
+	// Print number
+	dPrintStr( tmpStr );
+}
+
 void printInt16( uint16_t in )
 {
 	// Max number of characters is 5 + 1 for null
