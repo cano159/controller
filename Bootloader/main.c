@@ -188,7 +188,7 @@ void main()
 #elif defined(_mk20dx256vlh7_) // Kiibohd-dfu
 	// Enabling LED to indicate we are in the bootloader
 	GPIOB_PDDR |= (1<<19); // set as output pin
-	PORTB_PCR19 = PORT_PCR_MUX(1); // config as GPIO
+	PORTB_PCR19 = PORT_PCR_SRE | PORT_PCR_DSE | PORT_PCR_MUX(1); // config as GPIO
 	GPIOB_PSOR |= (1<<19);
 #else
 #error "Incompatible chip for bootloader"

@@ -74,7 +74,7 @@ inline void init_errorLED()
 	GPIOB_PDDR |= (1<<19);
 
 	// Setup pin - A5 - See Lib/pin_map.mchck for more details on pins
-	PORTB_PCR19 = PORT_PCR_MUX(1);
+	PORTB_PCR19 = PORT_PCR_SRE | PORT_PCR_DSE | PORT_PCR_MUX(1);
 #endif
 }
 
