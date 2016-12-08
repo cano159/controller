@@ -46,11 +46,13 @@
 // ----- Variables -----
 
 // 6 reads on left hand side
-uint8_t numReads = 6;
-uint8_t numStrobes = 5;
+#define numReads 6
+#define numStrobes 5
 // Usually determined by RC circuit time constant * 5
 // Lower if using drain
 uint32_t RELAX_TIME = 5;
+
+KeyState keyStates[ numReads * numStrobes ];
 
 // ----- Functions -----
 
@@ -149,6 +151,11 @@ inline void Scan_setup()
 	adcInit();
 
 	//Matrix_setup();
+	for ( uint8_t i = 0; i < numReads * numStrobes; i++ )
+	{
+		keyStates[i].depth = 0;
+		keyStates[i].pressed = false;
+	}
 
 }
 
@@ -158,33 +165,37 @@ inline uint8_t Scan_loop()
 {
 	// Scan Matrix
 	//Matrix_scan( Scan_scanCount++ );
-	for (int read = 0; read < numReads; read++) {
+	for (int read = 0; read < numReads; read++)
+	{
+		// Select read line on mux, might need a delay afterwards
 		selectReadLine(read);
-		/*
-		print(" r ");
-		printInt8(read);
-		*/
-		for (int strobe = 0; strobe < 5; strobe++) {
+
+		// Strobe all lines
+		for (int strobe = 0; strobe < numStrobes; strobe++)
+		{
+			// Key ID
+			uint8_t key = numStrobes * read + strobe;
+			KeyState *state = &keyStates[ key ];
+
 			uint8_t value = strobeRead(strobe);
-			uint8_t norm = normalise((uint8_t)value);
-			if (norm > 0x80) {
-				printInt8(read);
-				print(" ");
-				printInt8(strobe);
-				print(NL);
+			state->depth = normalise((uint8_t)value);
+
+			// Hysteresis for doing digital press
+			if (!state->pressed && state->depth > 0x90)
+			{
+				// Key just pressed
+				state->pressed = true;
+				print("press" NL);
+			}
+			else if (state -> pressed && state-> depth < 0x80)
+			{
+				// Key just released
+				state->pressed = false;
+				print("release" NL);
 			}
 
-			/*
-			print(" | ");
-			printInt8(strobe);
-			print(" ");
-			printInt8Pad(value);
-			print(" ");
-			printInt8Pad(norm);
-			*/
 		}
 	}
-	//print(NL);
 
 	return 0;
 }

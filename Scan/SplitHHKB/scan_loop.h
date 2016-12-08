@@ -25,8 +25,13 @@
 
 // Compiler Includes
 #include <stdint.h>
+#include <stdbool.h>
 
 
+typedef struct KeyState {
+	bool pressed;
+	uint8_t depth;
+} __attribute__((packed)) KeyState;
 
 // ----- Functions -----
 
