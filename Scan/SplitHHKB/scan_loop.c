@@ -185,13 +185,19 @@ inline uint8_t Scan_loop()
 			{
 				// Key just pressed
 				state->pressed = true;
-				print("press" NL);
+				print("press ");
+				printInt8(key);
+				print(NL);
+				// Send press
+				Macro_keyState( key, 0x01 );
 			}
 			else if (state -> pressed && state-> depth < 0x80)
 			{
 				// Key just released
 				state->pressed = false;
 				print("release" NL);
+				// Send release
+				Macro_keyState( key, 0x03 );
 			}
 
 		}
