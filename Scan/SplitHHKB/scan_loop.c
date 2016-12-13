@@ -38,7 +38,8 @@
 // Local Includes
 #include "scan_loop.h"
 #include "adc.c"
-
+#include "eeprom.c"
+#include "calibration.c"
 
 
 // ----- Function Declarations -----
@@ -105,9 +106,7 @@ uint8_t strobeRead(uint8_t s)
 }
 
 /* use calibration values to normalise readings nicely */
-uint8_t normalise(uint8_t value) {
-	uint16_t calMin = 45;
-	uint16_t calMax = 245;
+uint8_t normalise(uint8_t calMin, uint8_t calMax, uint8_t value) {
 	// Clamp to min and max values
 	if (value < calMin) {
 		value = calMin;
@@ -150,6 +149,12 @@ inline void Scan_setup()
 	// Initialise ADC
 	adcInit();
 
+	// Initialise EEPROM
+	eeprom_initialize();
+
+	// Setup calibration
+	calibration_setup();
+
 	//Matrix_setup();
 	for ( uint8_t i = 0; i < numReads * numStrobes; i++ )
 	{
@@ -159,10 +164,10 @@ inline void Scan_setup()
 
 }
 
-
 // Main Detection Loop
 inline uint8_t Scan_loop()
 {
+
 	// Scan Matrix
 	//Matrix_scan( Scan_scanCount++ );
 	for (int read = 0; read < numReads; read++)
@@ -178,16 +183,15 @@ inline uint8_t Scan_loop()
 			KeyState *state = &keyStates[ key ];
 
 			uint8_t value = strobeRead(strobe);
-			state->depth = normalise((uint8_t)value);
+			uint8_t calMin = calibration_get_min((uint8_t*) (uint32_t) key);
+			uint8_t calMax = calibration_get_max((uint8_t*) (uint32_t) key);
+			state->depth = normalise(calMin, calMax, (uint8_t)value);
 
 			// Hysteresis for doing digital press
 			if (!state->pressed && state->depth > 0x90)
 			{
 				// Key just pressed
 				state->pressed = true;
-				print("press ");
-				printInt8(key);
-				print(NL);
 				// Send press
 				Macro_keyState( key, 0x01 );
 			}
@@ -195,7 +199,6 @@ inline uint8_t Scan_loop()
 			{
 				// Key just released
 				state->pressed = false;
-				print("release" NL);
 				// Send release
 				Macro_keyState( key, 0x03 );
 			}

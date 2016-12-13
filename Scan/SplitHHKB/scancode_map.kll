@@ -6,13 +6,11 @@ KLL = 0.3c;
 # Modified Date
 Date = 2016-12-06;
 
-
-
 S0x12 : U"Esc";
 S0x13 : U"1";
 S0x04 : U"2";
 S0x09 : U"3";
-S0x14 : U"4";
+S0x0E : U"4";
 S0x18 : U"5";
 S0x1D : U"6";
 
@@ -29,7 +27,7 @@ S0x1D : U"6";
 S0x11 : U"Tab";
 S0x3 : U"Q";
 S0x8 : U"W";
-S0x13 : U"E";
+S0x0D : U"E";
 S0x17 : U"R";
 S0x1C : U"T";
 
@@ -43,11 +41,11 @@ S0x1C : U"T";
 # S0x1D : U"Backslash";
 # S0x1E : U"Delete";
 
-S0x10 : U"CapsLock";
+S0x10 : U"Ctrl";
 S0x02 : U"A";
 S0x07 : U"S";
 S0x0C : U"D";
-S0x0D : U"F";
+S0x16 : U"F";
 S0x1B : U"G";
 
 # S0x25 : U"H";
@@ -78,7 +76,7 @@ S0x1A : U"B";
 
 S0x00 : U"Gui";
 S0x05 : U"LAlt";
-S0x0A : U"Ctrl";
+S0x0A : flashMode();
 S0x14 : U"Space";
 
 # S0x3E : U"Function1";
