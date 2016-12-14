@@ -78,6 +78,11 @@ inline void init_errorLED()
 #endif
 }
 
+inline void errorLEDToggle()
+{
+	GPIOB_PTOR |= (1<<19);
+}
+
 // Error LED Control
 inline void errorLED( uint8_t on )
 {

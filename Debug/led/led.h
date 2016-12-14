@@ -29,4 +29,4 @@
 
 void init_errorLED( void );
 void errorLED( uint8_t on );
-
+void errorLEDToggle();
