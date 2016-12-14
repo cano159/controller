@@ -37,8 +37,8 @@
 
 // Local Includes
 #include "scan_loop.h"
-#include "adc.c"
 #include "eeprom.c"
+#include "hardware.h"
 #include "calibration.c"
 
 
@@ -46,80 +46,7 @@
 
 // ----- Variables -----
 
-// 6 reads on left hand side
-#define numReads 6
-#define numStrobes 5
-// Usually determined by RC circuit time constant * 5
-// Lower if using drain
-uint32_t RELAX_TIME = 5;
-
-KeyState keyStates[ numReads * numStrobes ];
-
-// ----- Functions -----
-
-/* Select a channel on the multiplexer */
-void selectReadLine(uint8_t r) {
-
-	// clear pins
-	GPIOA_PCOR |= (1 << 5);  // S0 = PTA5
-	GPIOA_PCOR |= (1 << 12); // S1 = PTA12
-	GPIOA_PCOR |= (1 << 13); // S1 = PTA13
-
-	// set pins (decode r to binary)
-	if (r & 1) {
-		GPIOA_PSOR |= (1 << 5);
-	}
-	if ((r >> 1) & 1) {
-		GPIOA_PSOR |= (1 << 12);
-	}
-	if ((r >> 2) & 1) {
-		GPIOA_PSOR |= (1 << 13);
-	}
-
-}
-
-uint32_t lastTime = 0;
-/**
- * Perform a measurement of the selected read line using given strobe line.
- */
-uint8_t strobeRead(uint8_t s)
-{
-	uint8_t value;
-	// Make sure enough time has elapsed since the last call
-	// This is to ensure the matrix voltages have relaxed
-	while (micros() < lastTime + RELAX_TIME);
-	// Float the drain pin
-	GPIOA_PSOR |= (1 << 4); // High floats pin in open drain mode
-	// No interrupts which might ruin timing
-	__disable_irq();
-	// Strobes are PTD0-4 which is convenient
-	GPIOD_PSOR |= (1 << s); // Set strobe high
-	// Get the ADC reading
-	value = adcRead();
-	GPIOD_PCOR |= (1 << s); // Set strobe low
-	__enable_irq();
-	// Ground the drain pin
-	GPIOA_PCOR |= (1 << 4); // Low grounds pin in open drain mode
-	// Set timer for next read
-	lastTime = micros();
-	return value;
-}
-
-/* use calibration values to normalise readings nicely */
-uint8_t normalise(uint8_t calMin, uint8_t calMax, uint8_t value) {
-	// Clamp to min and max values
-	if (value < calMin) {
-		value = calMin;
-	} else if (value > calMax) {
-		value = calMax;
-	}
-	// Feature scaling, scale needs to be done before int division
-	// Cast is okay because the fraction must be between 0 and 1 due to
-	// clamping.
-	uint16_t numerator = 0xFF * (value - calMin);
-	uint8_t denominator = calMax - calMin;
-	return (uint8_t) (numerator / denominator);
-}
+KeyState keyStates[ NUM_READS * NUM_STROBES ];
 
 // Setup
 inline void Scan_setup()
@@ -156,7 +83,7 @@ inline void Scan_setup()
 	calibration_setup();
 
 	//Matrix_setup();
-	for ( uint8_t i = 0; i < numReads * numStrobes; i++ )
+	for ( uint8_t i = 0; i < NUM_READS * NUM_STROBES; i++ )
 	{
 		keyStates[i].depth = 0;
 		keyStates[i].pressed = false;
@@ -168,39 +95,41 @@ inline void Scan_setup()
 inline uint8_t Scan_loop()
 {
 
-	// Scan Matrix
-	//Matrix_scan( Scan_scanCount++ );
-	for (int read = 0; read < numReads; read++)
+	// Go through all read lines
+	for (int read = 0; read < NUM_READS; read++)
 	{
-		// Select read line on mux, might need a delay afterwards
+		// Select read line on mux
 		selectReadLine(read);
 
 		// Strobe all lines
-		for (int strobe = 0; strobe < numStrobes; strobe++)
+		for (int strobe = 0; strobe < NUM_STROBES; strobe++)
 		{
 			// Key ID
-			uint8_t key = numStrobes * read + strobe;
+			uint8_t key = keyID(read, strobe);
 			KeyState *state = &keyStates[ key ];
 
 			uint8_t value = strobeRead(strobe);
-			uint8_t calMin = calibration_get_min((uint8_t*) (uint32_t) key);
-			uint8_t calMax = calibration_get_max((uint8_t*) (uint32_t) key);
-			state->depth = normalise(calMin, calMax, (uint8_t)value);
+			uint8_t calMin = calibration_get_min(key);
+			uint8_t calMax = calibration_get_max(key);
+			state->depth = normalise(calMin, calMax, value);
+
+			uint8_t actDepth = get_actuation_depth();
+			uint8_t relDepth = actDepth - 3 * calibration_get_noise(key);
 
 			// Hysteresis for doing digital press
-			if (!state->pressed && state->depth > 0x90)
+			if (!state->pressed && state->depth > actDepth)
 			{
 				// Key just pressed
 				state->pressed = true;
 				// Send press
-				Macro_keyState( key, 0x01 );
+				//Macro_keyState( key, 0x01 );
 			}
-			else if (state -> pressed && state-> depth < 0x80)
+			else if (state -> pressed && state->depth < relDepth)
 			{
 				// Key just released
 				state->pressed = false;
 				// Send release
-				Macro_keyState( key, 0x03 );
+				//Macro_keyState( key, 0x03 );
 			}
 
 		}

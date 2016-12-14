@@ -1,5 +1,6 @@
 /**
- * Copyright (c) 2016 Tom Smalley
+ * Copyright (C) 2014-2016 by Jacob Alexander
+ * Copyright (C) 2016 by Tom Smalley
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -20,28 +21,40 @@
  * THE SOFTWARE.
  */
 
-/**
- * Functions for communication with the ADC.
- * Specifically ADC1, reading channel DADP0 in single ended 8 bit mode.
- */
-
 #pragma once
 
+// ----- Includes -----
+
 // Compiler Includes
-#include <stdint.h>
+#include <Lib/ScanLib.h>
+
+// Local Includes
+#include "adc.h"
+#include "scan_loop.h"
+
+// ----- Variables -----
+
+// 6 reads on left hand side
+#define NUM_READS 6
+#define NUM_STROBES 5
+#define NUM_KEYS (NUM_READS * NUM_STROBES)
+// Determined by RC circuit time constant * 5
+// Significantly lower if using drain
+#define RELAX_TIME 5
+
+KeyState keyStates[ NUM_READS * NUM_STROBES ];
+
+// ----- Functions -----
+
+uint8_t keyID(uint8_t read, uint8_t strobe);
+
+/* Select a channel on the multiplexer */
+void selectReadLine(uint8_t r);
 
 /**
- * Initialise the ADC.
+ * Perform a measurement of the selected read line using given strobe line.
  */
-void adcInit();
+uint8_t strobeRead(uint8_t s);
 
-/**
- * Do ADC calibration sequence.
- */
-void adcCalibrate();
-
-/**
- * Perform a conversion on DADP0.
- * @return digitisation of analog value from 0V to 3.3V
- */
-uint8_t adcRead();
+/* use calibration values to normalise readings nicely */
+uint8_t normalise(uint8_t calMin, uint8_t calMax, uint8_t value);

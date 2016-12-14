@@ -25,6 +25,8 @@
  * Specifically ADC1, reading channel DADP0 in single ended 8 bit mode.
  */
 
+#include <Lib/ScanLib.h>
+
 #include "adc.h"
 
 /**

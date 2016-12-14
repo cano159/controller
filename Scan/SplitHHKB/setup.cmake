@@ -18,6 +18,8 @@
 #
 set ( Module_SRCS
 	scan_loop.c
+	adc.c
+	hardware.c
 )
 
 
