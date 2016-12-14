@@ -28,64 +28,163 @@
 #include "adc.h"
 #include "hardware.h"
 
-
+// Memory addresses in EEPROM (offsets)
 #define CAL_LOW_ADDR             0x000
 #define CAL_HIGH_ADDR            CAL_LOW_ADDR + NUM_KEYS
 #define CAL_NOISE_ADDR           CAL_HIGH_ADDR + NUM_KEYS
 #define CAL_ACTUATION_ADDR       CAL_NOISE_ADDR + NUM_KEYS
+#define CAL_PERFORMED_ADDR       (uint8_t*) 0x700
 
-#define DEFAULT_ACTUATION_DEPTH 127
+// 1.5 mm = 96
+// 2.2 mm = 140
+// 3.0 mm = 191
+#define DEFAULT_ACTUATION_DEPTH 96
 
-uint8_t calibration_get_min(uint8_t key)
+// For recording a calibration
+// If the byte at CAL_PERFORMED_ADDR is not equal to this, we know not to send
+// keystrokes
+#define CAL_PERFORMED_TOKEN 0xAB
+
+/**
+ * Check if calibration has been performed previously.
+ * Mainly to prevent spamming keypresses on first boot.
+ */
+bool calibration_performed() {
+	return (eeprom_read_byte(CAL_PERFORMED_ADDR) == CAL_PERFORMED_TOKEN);
+}
+/**
+ * Set calibration status to performed
+ */
+void calibration_set_performed() {
+	eeprom_write_byte(CAL_PERFORMED_ADDR, CAL_PERFORMED_TOKEN);
+}
+/**
+ * Set calibration status to not performed (like first boot)
+ */
+void calibration_unset_performed() {
+	eeprom_write_byte(CAL_PERFORMED_ADDR, 0xFF);
+}
+
+/**
+ * Get the low calibration value for a key
+ */
+uint8_t calibration_get_low(uint8_t key)
 {
 	return eeprom_read_byte((uint8_t*) (uint32_t) key + CAL_LOW_ADDR);
 }
-void calibration_set_min(uint8_t key, uint8_t value)
+/**
+ * Set the low calibration value for a key
+ */
+void calibration_set_low(uint8_t key, uint8_t value)
 {
 	eeprom_write_byte((uint8_t*) (uint32_t) key + CAL_LOW_ADDR, value);
 }
 
-uint8_t calibration_get_max(uint8_t key)
+/**
+ * Get the high calibration value for a key
+ */
+uint8_t calibration_get_high(uint8_t key)
 {
 	return eeprom_read_byte((uint8_t*) (uint32_t) key + CAL_HIGH_ADDR);
 }
-void calibration_set_max(uint8_t key, uint8_t value)
+/**
+ * Set the high calibration value for a key
+ */
+void calibration_set_high(uint8_t key, uint8_t value)
 {
 	eeprom_write_byte((uint8_t*) (uint32_t) key + CAL_HIGH_ADDR, value);
 }
 
+/**
+ * Get the noise calibration value for a key
+ */
 uint8_t calibration_get_noise(uint8_t key)
 {
 	return eeprom_read_byte((uint8_t*) (uint32_t) key + CAL_NOISE_ADDR);
 }
+/**
+ * Set the noise calibration value for a key
+ */
 void calibration_set_noise(uint8_t key, uint8_t value)
 {
 	eeprom_write_byte((uint8_t*) (uint32_t) key + CAL_NOISE_ADDR, value);
 }
 
+/**
+ * Get the actuation depth (0-255, 0 = fully unpressed, 255 = fully pressed).
+ */
 uint8_t get_actuation_depth()
 {
 	return eeprom_read_byte((uint8_t*) CAL_ACTUATION_ADDR);
 }
+/**
+ * Set the actuation depth (0-255, 0 = fully unpressed, 255 = fully pressed).
+ * Requires sensible setting (somewhere in the middle depending on noise
+ * values).
+ */
 void calibration_set_depth(uint8_t actuation)
 {
 	eeprom_write_byte((uint8_t*) CAL_ACTUATION_ADDR, actuation);
 }
 
+/**
+ * Reset calibration data. Sets noise to sane value (real noise is probably
+ * less).
+ */
 void calibration_reset()
 {
 	for (int i = 0; i < NUM_KEYS; i++) {
-		calibration_set_min(i, 0x00);
-		calibration_set_max(i, 0xFF);
+		calibration_set_low(i, 0x00);
+		calibration_set_high(i, 0xFF);
 		calibration_set_noise(i, 0x10);
 	}
 }
 
+/**
+ * Print out all the calibration data and SNR for each key.
+ */
+void calibration_print_data()
+{
+	print(NL "Key | SNR | low | high | noise" NL);
+	for (int i = 0; i < NUM_KEYS; i++)
+	{
+		uint8_t high = calibration_get_high(i);
+		uint8_t low = calibration_get_low(i);
+		uint8_t noise = calibration_get_noise(i);
+		// Calculate signal to noise ratio
+		uint8_t snr = (high - low) / noise;
+
+		// Tell user
+		printInt8Pad(i);
+		print(" | ");
+		if (snr > 20) {
+			print("\033[32m"); // green
+		} else if (snr > 10) {
+			print("\033[33m"); // yellow
+		} else {
+			print("\033[31m"); // red
+		}
+		printInt8Pad(snr);
+		print("\033[0m"); // reset colour
+		print(" | ");
+		printInt8Pad(low);
+		print(" |  ");
+		printInt8Pad(high);
+		print(" |   ");
+		printInt8Pad(noise);
+		print(NL);
+	}
+}
+
+/**
+ * Main calibration routine.
+ */
 void calibration_start()
 {
-	// Determine noise floor
+	// Finding lowMin and lowMax
 	print(NL "Do not press any keys!" NL);
-	print("Determining noise floor");
+	delay(2000);
+	print("Taking readings");
 	uint8_t lowMin[NUM_KEYS];
 	uint8_t lowMax[NUM_KEYS];
 	for (int i = 0; i < NUM_KEYS; i++)
@@ -115,13 +214,15 @@ void calibration_start()
 			}
 		}
 		// Print a period every second
-		if (last / 1000 < millis() / 1000) print(".");
-		last = millis();
+		if (millis() - last >= 1000) {
+			print(".");
+			last = millis();
+		}
 	}
 	print(" done." NL NL);
 
-	// Peak values
-	print("Press and hold each key in turn. Listening for 60s..." NL);
+	// Finding highMax
+	print("Press and hold each key in turn." NL);
 	// Set min values to 255 and max values to 0 for comparison checking
 	uint8_t highMax[NUM_KEYS];
 	for (int i = 0; i < NUM_KEYS; i++)
@@ -148,19 +249,20 @@ void calibration_start()
 				if (value > highMax[key]) highMax[key] = value;
 			}
 		}
-		// Print count
-		if (last / 1000 < millis() / 1000)
+		// Print count in seconds
+		if (millis() - last >= 1000)
 		{
 			print("\033[2K\r"); // Erase current line
-			printInt8((millis() - start)/1000);
-			print("s" NL);
+			print("Taking readings... ");
+			printInt8(60 - (millis() - start)/1000);
+			print("s");
 		}
 		last = millis();
 	}
-	print("Done." NL);
+	print("\033[2K\r"); // Erase current line
+	print("Taking readings... done." NL);
 
-	// Determine useful variables and report to user
-	print(NL "Key | SNR | low | high | noise" NL);
+	// Determine useful variables and save to EEPROM
 	for (int i = 0; i < NUM_KEYS; i++)
 	{
 		uint8_t noise = lowMax[i] - lowMin[i];
@@ -169,33 +271,12 @@ void calibration_start()
 		if (lowMax[i] > highMax[i]) highMax[i] = lowMax[i];
 		uint8_t high = highMax[i] - noise / 2;
 		uint8_t low = lowMax[i] - noise / 2;
-		calibration_set_min((uint8_t*) i, low);
-		calibration_set_max((uint8_t*) i, high);
+		calibration_set_low(i, low);
+		calibration_set_high(i, high);
 		calibration_set_noise(i, noise);
-
-		// Calculate signal to noise ratio
-		uint8_t snr = (high - low) / noise;
-
-		// Tell user
-		printInt8Pad(i);
-		print(" | ");
-		if (snr > 20) {
-			print("\033[32m"); // green
-		} else if (snr > 10) {
-			print("\033[33m"); // yellow
-		} else {
-			print("\033[31m"); // red
-		}
-		printInt8Pad(snr);
-		print("\033[0m"); // reset colour
-		print(" | ");
-		printInt8Pad(low);
-		print(" |  ");
-		printInt8Pad(high);
-		print(" |   ");
-		printInt8Pad(noise);
-		print(NL);
 	}
+
+	calibration_print_data();
 
 }
 
@@ -203,39 +284,41 @@ void calibration_start()
 void cliFunc_calData( char* args );
 void cliFunc_calReset( char* args );
 void cliFunc_calibrate( char* args );
+void cliFunc_calStatus( char* args );
+void cliFunc_calEnable( char* args );
+void cliFunc_calDisable( char* args );
 void cliFunc_getDepth( char* args );
 void cliFunc_setDepth( char* args );
 
 CLIDict_Entry( calData, "Print calibration data." );
 CLIDict_Entry( calReset, "Reset calibration data." );
 CLIDict_Entry( calibrate, "Do calibration routine." );
+CLIDict_Entry( calStatus, "View calibration status." );
+CLIDict_Entry( calEnable, "Set calibration status as performed." NL "\t\tAllows keypresses to be sent to the host (including next boot)." );
+CLIDict_Entry( calDisable, "Set calibration status as not performed." NL "\t\tStops keypresses being sent to the host (including next boot)." );
 CLIDict_Entry( getDepth, "View current actuation depth (0-255)." );
-CLIDict_Entry( setDepth, "Set actuation depth (0-255)." NL "When called with no arguments, the default value is set.");
+CLIDict_Entry( setDepth, "Set actuation depth (0-255)." NL "\t\tWhen called with no arguments, the default value is set.");
 
 CLIDict_Def( calibrationCLIDict, "Calibration Commands" ) = {
 	CLIDict_Item( calData ),
 	CLIDict_Item( calReset ),
 	CLIDict_Item( calibrate ),
+	CLIDict_Item( calStatus ),
+	CLIDict_Item( calEnable ),
+	CLIDict_Item( calDisable ),
 	CLIDict_Item( getDepth ),
 	CLIDict_Item( setDepth ),
 	{ 0, 0, 0 } // Null entry for dictionary end
 };
 
+// Setup CLI
 void calibration_setup() {
 	CLI_registerDictionary( calibrationCLIDict, calibrationCLIDictName );
 }
 
 void cliFunc_calData( char* args )
 {
-	print("Key: min / max" NL);
-	for (uint32_t i = 0; i < CAL_HIGH_ADDR - CAL_LOW_ADDR; i++) {
-		printInt32(i);
-		print(": ");
-		printInt8(calibration_get_min(i));
-		print(" / ");
-		printInt8(calibration_get_max(i));
-		print(NL);
-	}
+	calibration_print_data();
 }
 
 void cliFunc_calReset( char* args )
@@ -248,9 +331,28 @@ void cliFunc_calibrate( char* args )
 	calibration_start();
 }
 
+void cliFunc_calStatus( char* args )
+{
+	if (calibration_performed()) {
+		print(NL "Calibration active." NL);
+	} else {
+		print(NL "Calibration inactive." NL);
+	}
+}
+
+void cliFunc_calEnable( char* args )
+{
+	calibration_set_performed();
+}
+
+void cliFunc_calDisable( char* args )
+{
+	calibration_unset_performed();
+}
+
 void cliFunc_getDepth( char* args )
 {
-	print("Actuation depth: ");
+	print(NL "Actuation depth: ");
 	printInt8(get_actuation_depth());
 	print( NL );
 }
@@ -275,7 +377,7 @@ void cliFunc_setDepth( char* args )
 	calibration_set_depth(depth);
 
 	// Show new value
-	print("New actuation depth: ");
+	print(NL "New actuation depth: ");
 	printInt8(get_actuation_depth());
 	print( NL );
 }

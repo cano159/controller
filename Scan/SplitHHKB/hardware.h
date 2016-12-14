@@ -34,8 +34,14 @@
 
 // ----- Variables -----
 
+#if defined(SPLIT_HHKB_LEFT)
 // 6 reads on left hand side
 #define NUM_READS 6
+#elif defined(SPLIT_HHKB_RIGHT)
+#define NUM_READS 7
+#else
+#error
+#endif
 #define NUM_STROBES 5
 #define NUM_KEYS (NUM_READS * NUM_STROBES)
 // Determined by RC circuit time constant * 5

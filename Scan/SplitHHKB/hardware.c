@@ -91,17 +91,17 @@ uint8_t strobeRead(uint8_t s)
 }
 
 /* use calibration values to normalise readings nicely */
-uint8_t normalise(uint8_t calMin, uint8_t calMax, uint8_t value) {
+uint8_t normalise(uint8_t calLow, uint8_t calHigh, uint8_t value) {
 	// Clamp to min and max values
-	if (value < calMin) {
-		value = calMin;
-	} else if (value > calMax) {
-		value = calMax;
+	if (value < calLow) {
+		value = calLow;
+	} else if (value > calHigh) {
+		value = calHigh;
 	}
 	// Feature scaling, scale needs to be done before int division
 	// Cast is okay because the fraction must be between 0 and 1 due to
 	// clamping.
-	uint16_t numerator = 0xFF * (value - calMin);
-	uint8_t denominator = calMax - calMin;
+	uint16_t numerator = 0xFF * (value - calLow);
+	uint8_t denominator = calHigh - calLow;
 	return (uint8_t) (numerator / denominator);
 }

@@ -8,6 +8,13 @@
 ###
 
 
+IF(SPLIT_HHKB_LEFT)
+	ADD_DEFINITIONS(-DSPLIT_HHKB_LEFT)
+ENDIF(SPLIT_HHKB_LEFT)
+IF(SPLIT_HHKB_RIGHT)
+	ADD_DEFINITIONS(-DSPLIT_HHKB_RIGHT)
+ENDIF(SPLIT_HHKB_RIGHT)
+
 
 ###
 # Chip Selection
@@ -27,7 +34,6 @@ set( CHIP
         "mk20dx256vlh7"    # Kiibohd-dfu mk20dx256vlh7
 	CACHE STRING "Microcontroller Chip"
 )
-
 
 
 ###

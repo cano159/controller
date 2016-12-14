@@ -11,7 +11,7 @@
 
 # Feel free to change the variables in this section to configure your keyboard
 
-BuildPath="splithhkb"
+BuildPathStart="splithhkb"
 
 ## KLL Configuration ##
 
@@ -62,11 +62,19 @@ Compiler="gcc"
 # Shouldn't need to touch this section
 
 # Check if the library can be found
-if [ ! -f cmake.bash ]; then
+if [ ! -f cmakehhkb-left.bash ]; then
 	echo "ERROR: Cannot find 'cmake.bash'"
 	exit 1
 fi
 
 # Load the library
-source cmake.bash
+source cmakehhkb-left.bash
 
+# Check if the library can be found
+if [ ! -f cmakehhkb-right.bash ]; then
+	echo "ERROR: Cannot find 'cmake.bash'"
+	exit 1
+fi
+
+# Load the library
+source cmakehhkb-right.bash

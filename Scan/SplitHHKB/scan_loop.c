@@ -45,7 +45,7 @@
 // ----- Function Declarations -----
 
 // ----- Variables -----
-
+uint32_t lastTimeLedBlink = 0;
 KeyState keyStates[ NUM_READS * NUM_STROBES ];
 
 // Setup
@@ -94,44 +94,56 @@ inline void Scan_setup()
 // Main Detection Loop
 inline uint8_t Scan_loop()
 {
-
-	// Go through all read lines
-	for (int read = 0; read < NUM_READS; read++)
-	{
-		// Select read line on mux
-		selectReadLine(read);
-
-		// Strobe all lines
-		for (int strobe = 0; strobe < NUM_STROBES; strobe++)
+	if (calibration_performed()) {
+		// Go through all read lines
+		for (int read = 0; read < NUM_READS; read++)
 		{
-			// Key ID
-			uint8_t key = keyID(read, strobe);
-			KeyState *state = &keyStates[ key ];
+			// Select read line on mux
+			selectReadLine(read);
 
-			uint8_t value = strobeRead(strobe);
-			uint8_t calMin = calibration_get_min(key);
-			uint8_t calMax = calibration_get_max(key);
-			state->depth = normalise(calMin, calMax, value);
-
-			uint8_t actDepth = get_actuation_depth();
-			uint8_t relDepth = actDepth - 3 * calibration_get_noise(key);
-
-			// Hysteresis for doing digital press
-			if (!state->pressed && state->depth > actDepth)
+			// Strobe all lines
+			for (int strobe = 0; strobe < NUM_STROBES; strobe++)
 			{
-				// Key just pressed
-				state->pressed = true;
-				// Send press
-				//Macro_keyState( key, 0x01 );
-			}
-			else if (state -> pressed && state->depth < relDepth)
-			{
-				// Key just released
-				state->pressed = false;
-				// Send release
-				//Macro_keyState( key, 0x03 );
-			}
+				// Key ID
+				uint8_t key = keyID(read, strobe);
+#if defined(SPLIT_HHKB_LEFT)
+				if (key == 25) continue;
+#elif defined(SPLIT_HHKB_RIGHT)
+				// skip 2 keys
+#endif
+				KeyState *state = &keyStates[ key ];
 
+				uint8_t value = strobeRead(strobe);
+				uint8_t calLow = calibration_get_low(key);
+				uint8_t calHigh = calibration_get_high(key);
+				state->depth = normalise(calLow, calHigh, value);
+
+				uint8_t actDepth = get_actuation_depth();
+				uint8_t relDepth = actDepth - 3 * calibration_get_noise(key);
+
+				// Hysteresis for doing digital press
+				if (!state->pressed && state->depth > actDepth)
+				{
+					// Key just pressed
+					state->pressed = true;
+					// Send press
+					Macro_keyState( key, 0x01 );
+				}
+				else if (state -> pressed && state->depth < relDepth)
+				{
+					// Key just released
+					state->pressed = false;
+					// Send release
+					Macro_keyState( key, 0x03 );
+				}
+
+			}
+		}
+	} else {
+		// Blink the LED to warn user
+		if (millis() - lastTimeLedBlink > 1000) {
+			errorLEDToggle();
+			lastTimeLedBlink = millis();
 		}
 	}
 
