@@ -94,13 +94,14 @@ inline void Scan_setup()
 // Main Detection Loop
 inline uint8_t Scan_loop()
 {
-	if (calibration_performed()) {
+	// Check calibration status
+	if (calibration_performed())
+	{
 		// Go through all read lines
 		for (int read = 0; read < NUM_READS; read++)
 		{
 			// Select read line on mux
 			selectReadLine(read);
-
 			// Strobe all lines
 			for (int strobe = 0; strobe < NUM_STROBES; strobe++)
 			{
@@ -109,7 +110,8 @@ inline uint8_t Scan_loop()
 #if defined(SPLIT_HHKB_LEFT)
 				if (key == 25) continue;
 #elif defined(SPLIT_HHKB_RIGHT)
-				// skip 2 keys
+				if (key == 25) continue;
+				if (key == 26) continue;
 #endif
 				KeyState *state = &keyStates[ key ];
 
@@ -127,21 +129,32 @@ inline uint8_t Scan_loop()
 					// Key just pressed
 					state->pressed = true;
 					// Send press
+#if defined(SPLIT_HHKB_LEFT)
 					Macro_keyState( key, 0x01 );
+#elif defined(SPLIT_HHKB_RIGHT)
+					Macro_keyState( key + 30, 0x01 );
+#endif
 				}
 				else if (state -> pressed && state->depth < relDepth)
 				{
 					// Key just released
 					state->pressed = false;
 					// Send release
+#if defined(SPLIT_HHKB_LEFT)
 					Macro_keyState( key, 0x03 );
+#elif defined(SPLIT_HHKB_RIGHT)
+					Macro_keyState( key + 30, 0x03 );
+#endif
 				}
 
 			}
 		}
-	} else {
-		// Blink the LED to warn user
-		if (millis() - lastTimeLedBlink > 1000) {
+	}
+	else
+	{
+		// Blink the LED to warn user that calibration is needed
+		if (millis() - lastTimeLedBlink > 1000)
+		{
 			errorLEDToggle();
 			lastTimeLedBlink = millis();
 		}

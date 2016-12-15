@@ -256,8 +256,8 @@ void calibration_start()
 			print("Taking readings... ");
 			printInt8(60 - (millis() - start)/1000);
 			print("s");
+			last = millis();
 		}
-		last = millis();
 	}
 	print("\033[2K\r"); // Erase current line
 	print("Taking readings... done." NL);
