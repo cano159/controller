@@ -34,25 +34,30 @@
 
 // ----- Variables -----
 
+#define NUM_STROBES 5
+#define NUM_READS_LEFT 6
+#define NUM_READS_RIGHT 7
+#define NUM_KEYS_LEFT (NUM_READS_LEFT * NUM_STROBES)
+#define NUM_KEYS_RIGHT (NUM_READS_RIGHT * NUM_STROBES)
+#define TOTAL_NUM_KEYS (NUM_KEYS_LEFT + NUM_KEYS_RIGHT)
+
 #if defined(SPLIT_HHKB_LEFT)
-// 6 reads on left hand side
-#define NUM_READS 6
+#define NUM_READS NUM_READS_LEFT
 #elif defined(SPLIT_HHKB_RIGHT)
-#define NUM_READS 7
+#define NUM_READS NUM_READS_RIGHT
 #else
 #error
 #endif
-#define NUM_STROBES 5
+
 #define NUM_KEYS (NUM_READS * NUM_STROBES)
 // Determined by RC circuit time constant * 5
 // Significantly lower if using drain
 #define RELAX_TIME 5
 
-KeyState keyStates[ NUM_READS * NUM_STROBES ];
-
 // ----- Functions -----
 
 uint8_t keyID(uint8_t read, uint8_t strobe);
+uint8_t localKeyID(uint8_t read, uint8_t strobe);
 
 /* Select a channel on the multiplexer */
 void selectReadLine(uint8_t r);

@@ -20,7 +20,7 @@ S0x27 : U"9";
 S0x2C : U"0";
 S0x36 : U"Minus";
 S0x3B : U"Equal";
-S0x40 : U"Backspace";
+S0x40 : U"Backslash"; # Backspace
 
 S0x11 : U"Tab";
 S0x3 : U"Q";
@@ -36,7 +36,7 @@ S0x2B : U"O";
 S0x35 : U"P";
 S0x3A : U"LBrace";
 S0x3F : U"RBrace";
-S0x3C : U"Backslash";
+S0x3C : U"Backspace"; # Backslash
 
 S0x10 : U"Ctrl";
 S0x02 : U"A";

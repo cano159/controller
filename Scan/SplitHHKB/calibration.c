@@ -207,7 +207,7 @@ void calibration_start()
 			{
 				uint8_t value = strobeRead(strobe);
 				// Key ID
-				uint8_t key = keyID(read, strobe);
+				uint8_t key = localKeyID(read, strobe);
 
 				if (value < lowMin[key]) lowMin[key] = value;
 				if (value > lowMax[key]) lowMax[key] = value;
@@ -244,7 +244,7 @@ void calibration_start()
 			{
 				uint8_t value = strobeRead(strobe);
 				// Key ID
-				uint8_t key = keyID(read, strobe);
+				uint8_t key = localKeyID(read, strobe);
 				// Update max values
 				if (value > highMax[key]) highMax[key] = value;
 			}

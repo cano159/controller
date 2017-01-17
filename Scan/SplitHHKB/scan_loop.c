@@ -40,13 +40,72 @@
 #include "eeprom.c"
 #include "hardware.h"
 #include "calibration.c"
+#include "uart.c"
 
 
 // ----- Function Declarations -----
 
 // ----- Variables -----
 uint32_t lastTimeLedBlink = 0;
-KeyState keyStates[ NUM_READS * NUM_STROBES ];
+KeyState keyStates[ TOTAL_NUM_KEYS ];
+
+uint8_t uartBuffer[4] = {0, 0, 0, 0};
+int uartBufferPosition = 0;
+
+void uart1_status_isr()
+{
+	cli(); // Disable interrupts
+
+	// UART_S1 must be read for the interrupt to be cleared
+	if ( UART_S1 & ( UART_S1_RDRF | UART_S1_IDLE ) )
+	{
+		uint8_t available = UART_RCFIFO;
+		if (available == 0)
+		{
+			available = UART_D;
+			UART_CFIFO = UART_CFIFO_RXFLUSH;
+			goto done;
+		}
+
+		while (available-- > 0)
+		{
+			uint8_t val = UART_D;
+			if (val == 0xFF) { // start byte
+				uartBufferPosition = 0; // reset position
+			} else if (val == 0xFE) { // midpoint byte
+				if (uartBufferPosition != 2) { // check valid position
+					uartBufferPosition = -1;
+				}
+			} else if (val == 0xFD) { // end byte
+				if (uartBufferPosition == 4) { // check valid position
+					uint8_t key = uartBuffer[0] | (uartBuffer[1] << 4);
+					uint8_t depth = uartBuffer[2] | (uartBuffer[3] << 4);
+					KeyState *state = &keyStates[ key ];
+					state->depth = depth;
+
+					/*
+					print(NL "updating key ");
+					printInt8(key);
+					print(" to ");
+					printInt8(depth);
+					*/
+				}
+				uartBufferPosition = -1;
+			} else if (val < 0x10) {
+				if (uartBufferPosition == 4) {
+					uartBufferPosition = -1; // illegal state
+				} else if (uartBufferPosition >= 0) {
+					uartBuffer[uartBufferPosition] = val;
+					uartBufferPosition++;
+				}
+			}
+
+		}
+	}
+
+done:
+	sei(); // Enable interrupts
+}
 
 // Setup
 inline void Scan_setup()
@@ -82,8 +141,11 @@ inline void Scan_setup()
 	// Setup calibration
 	calibration_setup();
 
+	// UART calibration
+	uart_serial_setup();
+
 	//Matrix_setup();
-	for ( uint8_t i = 0; i < NUM_READS * NUM_STROBES; i++ )
+	for ( uint8_t i = 0; i < TOTAL_NUM_KEYS; i++ )
 	{
 		keyStates[i].depth = 0;
 		keyStates[i].pressed = false;
@@ -95,68 +157,67 @@ inline void Scan_setup()
 inline uint8_t Scan_loop()
 {
 	// Check calibration status
-	if (calibration_performed())
-	{
-		// Go through all read lines
-		for (int read = 0; read < NUM_READS; read++)
-		{
-			// Select read line on mux
-			selectReadLine(read);
-			// Strobe all lines
-			for (int strobe = 0; strobe < NUM_STROBES; strobe++)
-			{
-				// Key ID
-				uint8_t key = keyID(read, strobe);
-#if defined(SPLIT_HHKB_LEFT)
-				if (key == 25) continue;
-#elif defined(SPLIT_HHKB_RIGHT)
-				if (key == 25) continue;
-				if (key == 26) continue;
-#endif
-				KeyState *state = &keyStates[ key ];
-
-				uint8_t value = strobeRead(strobe);
-				uint8_t calLow = calibration_get_low(key);
-				uint8_t calHigh = calibration_get_high(key);
-				state->depth = normalise(calLow, calHigh, value);
-
-				uint8_t actDepth = get_actuation_depth();
-				uint8_t relDepth = actDepth - 3 * calibration_get_noise(key);
-
-				// Hysteresis for doing digital press
-				if (!state->pressed && state->depth > actDepth)
-				{
-					// Key just pressed
-					state->pressed = true;
-					// Send press
-#if defined(SPLIT_HHKB_LEFT)
-					Macro_keyState( key, 0x01 );
-#elif defined(SPLIT_HHKB_RIGHT)
-					Macro_keyState( key + 30, 0x01 );
-#endif
-				}
-				else if (state -> pressed && state->depth < relDepth)
-				{
-					// Key just released
-					state->pressed = false;
-					// Send release
-#if defined(SPLIT_HHKB_LEFT)
-					Macro_keyState( key, 0x03 );
-#elif defined(SPLIT_HHKB_RIGHT)
-					Macro_keyState( key + 30, 0x03 );
-#endif
-				}
-
-			}
-		}
-	}
-	else
+	if (!calibration_performed())
 	{
 		// Blink the LED to warn user that calibration is needed
 		if (millis() - lastTimeLedBlink > 1000)
 		{
 			errorLEDToggle();
 			lastTimeLedBlink = millis();
+		}
+		return 0;
+	}
+
+	// Go through all read lines
+	for (int read = 0; read < NUM_READS; read++)
+	{
+		// Select read line on mux
+		selectReadLine(read);
+		// Strobe all lines
+		for (int strobe = 0; strobe < NUM_STROBES; strobe++)
+		{
+			// Key ID
+			uint8_t key = keyID(read, strobe);
+			uint8_t lkey = localKeyID(read, strobe);
+#if defined(SPLIT_HHKB_LEFT)
+			if (key == 25) continue;
+#elif defined(SPLIT_HHKB_RIGHT)
+			if (lkey == 25) continue;
+			if (lkey == 26) continue;
+#endif
+			KeyState *state = &keyStates[ key ];
+
+			uint8_t value = strobeRead(strobe);
+			uint8_t calLow = calibration_get_low(lkey);
+			uint8_t calHigh = calibration_get_high(lkey);
+			state->depth = normalise(calLow, calHigh, value);
+
+			// Send key state via uart
+			uart_send_packet( key, state->depth );
+		}
+	}
+
+	// Send key states to macro module
+	uint8_t actDepth = get_actuation_depth();
+	//uint8_t relDepth = actDepth - 3 * calibration_get_noise(key);
+	uint8_t relDepth = actDepth - 30;
+	for (int key = 0; key < TOTAL_NUM_KEYS; key++)
+	{
+		KeyState *state = &keyStates[ key ];
+		// Hysteresis for doing digital press
+		if (!state->pressed && state->depth > actDepth)
+		{
+			// Key just pressed
+			state->pressed = true;
+			// Send press
+			Macro_keyState( key, 0x01 );
+		}
+		else if (state->pressed && state->depth < relDepth)
+		{
+			// Key just released
+			state->pressed = false;
+			// Send release
+			Macro_keyState( key, 0x03 );
 		}
 	}
 

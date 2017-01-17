@@ -36,6 +36,14 @@ uint32_t lastTime = 0;
 
 uint8_t keyID(uint8_t read, uint8_t strobe)
 {
+#if defined(SPLIT_HHKB_LEFT)
+	return localKeyID(read, strobe);
+#elif defined(SPLIT_HHKB_RIGHT)
+	return NUM_KEYS_LEFT + localKeyID(read, strobe);
+#endif
+}
+uint8_t localKeyID(uint8_t read, uint8_t strobe)
+{
 	return NUM_STROBES * read + strobe;
 }
 

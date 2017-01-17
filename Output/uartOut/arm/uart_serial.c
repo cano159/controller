@@ -168,9 +168,9 @@ void uart_serial_setup()
 
 // Kiibohd-dfu
 #elif defined(_mk20dx256vlh7_)
-	// Pin Setup for UART2
-	PORTD_PCR2 = PORT_PCR_PE | PORT_PCR_PS | PORT_PCR_PFE | PORT_PCR_MUX(3); // RX Pin
-	PORTD_PCR3 = PORT_PCR_DSE | PORT_PCR_SRE | PORT_PCR_MUX(3); // TX Pin
+	// Pin Setup for UART1
+	PORTE_PCR1 = PORT_PCR_PE | PORT_PCR_PS | PORT_PCR_PFE | PORT_PCR_MUX(3); // RX Pin
+	PORTE_PCR0 = PORT_PCR_DSE | PORT_PCR_SRE | PORT_PCR_MUX(3); // TX Pin
 
 // Teensy
 #else
@@ -212,10 +212,10 @@ void uart_serial_setup()
 #if defined(_mk20dx128_) || defined(_mk20dx128vlf5_) || defined(_mk20dx256_) // UART0 Debug
 	UART_TWFIFO = 2;
 	UART_RWFIFO = 4;
-#elif defined(_mk20dx256vlh7_) // UART2 Debug
-	// UART2 has a single byte FIFO
-	UART_TWFIFO = 1;
-	UART_RWFIFO = 1;
+#elif defined(_mk20dx256vlh7_) // UART1 Debug
+	// UART1 has 8 byte FIFO
+	UART_TWFIFO = 8;
+	UART_RWFIFO = 8;
 #endif
 
 	// TX FIFO Enabled, TX FIFO Size 1 (Max 8 datawords), RX FIFO Enabled, RX FIFO Size 1 (Max 8 datawords)
